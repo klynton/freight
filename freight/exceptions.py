@@ -9,7 +9,15 @@ class ApiError(Exception):
         super(ApiError, self).__init__(message)
 
 
-class CheckFailed(Exception):
+class CheckError(Exception):
+    pass
+
+
+class CheckFailed(CheckError):
+    pass
+
+
+class CheckPending(CheckError):
     pass
 
 

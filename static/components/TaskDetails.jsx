@@ -1,14 +1,20 @@
 /** @jsx React.DOM */
 
+var ansi_up = require('ansi_up');
 var React = require('react');
 var Router = require('react-router');
 
 var api = require('../api');
+var Duration = require('./Duration');
 var PollingMixin = require('../mixins/polling');
 var TimeSince = require('./TimeSince');
 
 var TaskDetails = React.createClass({
   mixins: [PollingMixin, Router.State],
+
+  contextTypes: {
+    setHeading: React.PropTypes.func,
+  },
 
   getInitialState() {
     return {
@@ -19,11 +25,15 @@ var TaskDetails = React.createClass({
     };
   },
 
+  componentWillUnmount() {
+    this.context.setHeading(null);
+  },
+
   componentWillMount() {
     api.request(this.getPollingUrl(), {
       success: (data) => {
+        this.context.setHeading(this.getTaskLabel(data));
         this.setState({
-          loading: false,
           task: data,
           liveScroll: this.taskInProgress(data)
         });
@@ -34,6 +44,10 @@ var TaskDetails = React.createClass({
 
   getPollingUrl() {
     return '/tasks/' + this.getParams().taskId + '/';
+  },
+
+  getTaskLabel(task) {
+    return task.app.name + '/' + task.environment + '#' + task.number;
   },
 
   pollingReceiveData(data) {
@@ -49,7 +63,7 @@ var TaskDetails = React.createClass({
     data.text.split('\n').forEach((line) => {
       var div = document.createElement('div');
       div.className = 'line';
-      div.innerHTML = line;
+      div.innerHTML = ansi_up.ansi_to_html(line);
       frag.appendChild(div);
     });
 
@@ -70,9 +84,15 @@ var TaskDetails = React.createClass({
     api.request(url, {
       success: (data) => {
         if (data.text !== "") {
-          this.updateBuildLog(data);
           this.setState({
+            loading: false,
             logNextOffset: data.nextOffset
+          });
+          this.updateBuildLog(data);
+        }
+        if (this.state.loading) {
+          this.setState({
+            loading: false
           });
         }
         if (this.taskInProgress(this.state.task)) {
@@ -91,6 +111,21 @@ var TaskDetails = React.createClass({
     });
   },
 
+  getStatusLabel(task) {
+    switch (task.status) {
+      case 'cancelled':
+        return 'Cancelled';
+      case 'failed':
+        return 'Failed';
+      case 'finished':
+        return 'Finished';
+      case 'pending':
+        return 'Pending';
+      case 'in_progress':
+        return 'In progress';
+    }
+  },
+
   render() {
     if (this.state.loading) {
       return <div className="loading" />;
@@ -98,19 +133,32 @@ var TaskDetails = React.createClass({
 
     var task = this.state.task;
 
-    var liveScrollClassName = "btn btn-default";
+    var liveScrollClassName = "btn btn-default btn-sm";
     if (this.state.liveScroll) {
       liveScrollClassName += " btn-active";
     }
 
     return (
       <div className="task-details">
-        <div className="task-log" ref="log" />
+        <div className="task-log">
+          <div ref="log" />
+          {this.taskInProgress(task) &&
+            <div className="loading-icon" />
+          }
+        </div>
 
         <div className="task-footer">
           <div className="container">
-            <h2>{task.app.name}/{task.environment} #{task.number}</h2>
-
+            <span className="task-status">
+              {task.dateFinished ?
+                <small>{this.getStatusLabel(task)} <TimeSince date={task.dateFinished} /> &mdash; <Duration seconds={task.duration} className="duration" /></small>
+              : (task.dateStarted ?
+                <small>Started <TimeSince date={task.dateStarted} /></small>
+              :
+                <small>Created <TimeSince date={task.dateCreated} /></small>
+              )}
+              <small> &mdash; by {task.user.name}</small>
+            </span>
             <div className="pull-right">
               <a className={liveScrollClassName}
                  onClick={this.toggleLiveScroll}>

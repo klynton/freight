@@ -77,6 +77,10 @@ class Task(db.Model):
     date_finished = Column(DateTime)
 
     @property
+    def was_forced(self):
+        return self.data.get('force', False)
+
+    @property
     def checks(self):
         return self.data.get('checks', [])
 
@@ -94,6 +98,6 @@ class Task(db.Model):
 
     @property
     def duration(self):
-        if not self.date_finished:
+        if not (self.date_finished and self.date_started):
             return
         return float('%.2f' % (self.date_finished - self.date_started).total_seconds())

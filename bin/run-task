@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-
+# TODO(dcramer): this needs abstracted into another Python helper and this file
+# should simply be a shell around calling that (it will ensure easier testing)
 from __future__ import absolute_import, unicode_literals
 
 import logging
@@ -8,15 +9,66 @@ import sys
 
 from datetime import datetime
 from flask import current_app
+from time import sleep
 
-from freight import providers, vcs
+from freight import checks, providers, vcs
 from freight.config import create_app, db, redis
-from freight.models import App, LogChunk, Repository, Task, TaskStatus
+from freight.exceptions import CheckError, CheckPending
+from freight.models import App, Repository, Task, TaskStatus
+from freight.utils.logging import ColoredFormatter
 from freight.utils.redis import lock
 from freight.utils.workspace import TemporaryWorkspace, Workspace
 
+INFO_CHECK_FINISHED = 'Check has passed: {check}'
 
-def main(task_id):
+INFO_CHECK_PENDING = 'Waiting on check {check}:\n  {message}'
+
+ERR_CHECK_FAILED = 'Task cancelled due to failing check {check}:\n  {message}'
+
+
+def checks_are_passing(app, task, log):
+    if not task.checks:
+        return True
+
+    checks_with_ids = dict(enumerate(task.checks))
+
+    announced_checks = set()
+    pending_checks = set(checks_with_ids.keys())
+    while pending_checks:
+        for check_id in set(pending_checks):
+            check_config = checks_with_ids[check_id]
+            check = checks.get(check_config['type'])
+            try:
+                check.check(app, task.sha, check_config['config'])
+
+            except CheckPending as e:
+                if check_config['type'] not in announced_checks:
+                    log.info(INFO_CHECK_PENDING.format(
+                        check=check_config['type'],
+                        message=unicode(e),
+                    ))
+                    announced_checks.add(check_config['type'])
+
+            except CheckError as e:
+                log.error(ERR_CHECK_FAILED.format(
+                    check=check_config['type'],
+                    message=unicode(e),
+                ))
+                return False
+
+            else:
+                pending_checks.remove(check_id)
+
+                log.info(INFO_CHECK_FINISHED.format(
+                    check=check_config['type'],
+                ))
+
+        if pending_checks:
+            sleep(5)
+    return True
+
+
+def main(task_id, log):
     task = Task.query.get(task_id)
     if not task:
         raise ValueError('Task(id=%s) not found' % task_id)
@@ -29,12 +81,19 @@ def main(task_id):
     db.session.add(task)
     db.session.commit()
 
+    if not task.was_forced and not checks_are_passing(app, task, log):
+        task.status = TaskStatus.failed
+        task.date_finished = datetime.utcnow()
+        db.session.add(task)
+        db.session.commit()
+        return
+
     provider = providers.get(task.provider)
 
     repo_home = Workspace(
         path=repo.get_path(),
+        log=log,
     )
-
 
     vcs_backend = vcs.get(
         repo.vcs,
@@ -45,7 +104,7 @@ def main(task_id):
     with lock(redis, 'repo:update:{}'.format(repo.id)):
         vcs_backend.clone_or_update()
 
-    workspace = TemporaryWorkspace()
+    workspace = TemporaryWorkspace(log=log)
 
     try:
         vcs_backend.checkout(task.sha, workspace)
@@ -66,10 +125,17 @@ def main(task_id):
 
 if __name__ == '__main__':
     # add workspace explicit handler
-    logger = logging.getLogger('workspace')
-    logger.addHandler(logging.StreamHandler())
-    logger.setLevel(logging.INFO)
+    handler = logging.StreamHandler()
+    handler.setFormatter(ColoredFormatter('>> %(message)s'))
+
+    log = logging.getLogger('freight')
+    log.addHandler(handler)
+    log.setLevel(logging.INFO)
+
+    # remove buffering on stdout/stderr
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+    sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', 0)
 
     app = create_app()
     with app.app_context():
-        main(sys.argv[1])
+        main(sys.argv[1], log)

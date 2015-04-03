@@ -115,15 +115,18 @@ class LogReporter(Thread):
             if not (is_running or chunk):
                 break
 
+            last_write = time()
+            flush_time = 3  # seconds
             while self.active and chunk:
                 result += chunk
-                while len(result) >= chunk_size:
+                while len(result) >= chunk_size or (time() - last_write) > flush_time:
                     newline_pos = result.rfind('\n', 0, chunk_size)
                     if newline_pos == -1:
                         newline_pos = chunk_size
                     else:
                         newline_pos += 1
                     self.save_chunk(result[:newline_pos])
+                    last_write = time()
                     result = result[newline_pos:]
                 chunk = proc.stdout.read(1)
             sleep(0.1)
@@ -151,7 +154,7 @@ class TaskRunner(object):
             args=['bin/run-task', str(self.task.id)],
             cwd=PROJECT_ROOT,
             stdout=PIPE,
-            stderr=STDOUT
+            stderr=STDOUT,
         )
         self._logreporter = LogReporter(
             app_context=current_app.app_context(),
@@ -160,13 +163,17 @@ class TaskRunner(object):
         )
         self._logreporter.start()
 
+    # TODO(dcramer): currently this is the sum of checks + job time which
+    # isnt ideal. We either could move checks into execute_task and have a new
+    # timeout just for them, or assume this timeout includes both and likely
+    # still add another timeout for checks
     def _timeout(self):
         logging.error('Task(id=%s) exceeded time limit of %ds', self.task.id, self.timeout)
 
         self._process.terminate()
         self._logreporter.terminate()
 
-        self._logreporter.save_chunk('Process exceeded time limit of %ds\n' % self.timeout)
+        self._logreporter.save_chunk('>> Process exceeded time limit of %ds\n' % self.timeout)
 
         # TODO(dcramer): ideally we could just send the signal to the subprocess
         # so it can still manage the failure state
@@ -181,7 +188,7 @@ class TaskRunner(object):
         self._process.terminate()
         self._logreporter.terminate()
 
-        self._logreporter.save_chunk('Task was cancelled\n')
+        self._logreporter.save_chunk('>> Task was cancelled\n')
 
         # TODO(dcramer): ideally we could just send the signal to the subprocess
         # so it can still manage the failure state
