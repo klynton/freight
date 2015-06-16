@@ -1,4 +1,4 @@
-from __future__ import absolute_import, unicode_literals
+from __future__ import absolute_import
 
 import json
 import mock
@@ -33,6 +33,7 @@ class AppUpdateTest(AppDetailsBase):
             'notifiers': '[{"type": "slack", "config": {"webhook_url": "https://example.com"}}]',
             'checks': '[{"type": "github", "config": {"contexts": ["travisci"], "repo": "getsentry/freight"}}]',
             'repository': 'git@example.com:repo-name.git',
+            'environments': '{"staging": {"default_ref": "develop"}}',
         })
         assert resp.status_code == 200
         data = json.loads(resp.data)
@@ -41,7 +42,8 @@ class AppUpdateTest(AppDetailsBase):
         app = App.query.get(self.app.id)
         assert app.name == 'foobar'
         assert app.provider == 'shell'
-        assert app.provider_config == {'command': '/usr/bin/true', 'timeout': 50}
+        assert app.provider_config['command'] == '/usr/bin/true'
+        assert app.provider_config['timeout'] == 50
         assert app.notifiers == [
             {'type': 'slack', 'config': {'webhook_url': 'https://example.com'}},
         ]
@@ -49,6 +51,8 @@ class AppUpdateTest(AppDetailsBase):
         assert len(app.checks) == 1
         assert app.checks[0]['type'] == 'github'
         assert app.checks[0]['config'] == {'contexts': ['travisci'], 'repo': 'getsentry/freight'}
+        assert len(app.environments) == 1
+        assert app.environments['staging'] == {'default_ref': 'develop'}
 
     def test_no_params(self):
         resp = self.client.put(self.path)
@@ -109,6 +113,21 @@ class AppUpdateTest(AppDetailsBase):
         assert resp.status_code == 400
         data = json.loads(resp.data)
         assert data['error_name'] == 'invalid_check'
+
+    def test_invalid_environments_type(self):
+        resp = self.client.put(self.path, data={
+            'environments': '[{"type": "github", "config": {}}]',
+        })
+        assert resp.status_code == 400
+        data = json.loads(resp.data)
+        assert data['error_name'] == 'invalid_environment'
+
+        resp = self.client.put(self.path, data={
+            'environments': '{"foo": []}',
+        })
+        assert resp.status_code == 400
+        data = json.loads(resp.data)
+        assert data['error_name'] == 'invalid_environment'
 
 
 class AppDeleteTest(AppDetailsBase):

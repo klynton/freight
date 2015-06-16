@@ -1,4 +1,4 @@
-from __future__ import absolute_import, unicode_literals
+from __future__ import absolute_import
 
 __all__ = ['Fixtures']
 
@@ -25,6 +25,14 @@ class Fixtures(object):
                     'config': {'webhook_url': 'https://example.com'},
                 },
             ],
+            'environments': {
+                'production': {
+                    'default_ref': 'master',
+                },
+                'staging': {
+                    'default_ref': 'HEAD',
+                },
+            }
         })
 
         app = App(repository_id=repository.id, **kwargs)

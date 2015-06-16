@@ -24,6 +24,7 @@ Current Features
 - API-accessible deploy logs
 - Hubot integration (starting deploys)
 - Slack integration (notifying when deploys start/finish/fail)
+- Sentry integration (release tracking, error reporting)
 - Integration with GitHub status checks (i.e. did Circle CI pass on sha XXX)
 - A GUI to get an overview of deploy status and history
 
@@ -55,6 +56,6 @@ Resources
 =========
 
 - `Documentation <http://freight.readthedocs.org>`_
-- `Bug Tracker <http://github.com/getsentry/freight/issues>`_
-- `Code <http://github.com/getsentry/freight>`_
+- `Bug Tracker <https://github.com/getsentry/freight/issues>`_
+- `Code <https://github.com/getsentry/freight>`_
 - `IRC <irc://irc.freenode.net/sentry>`_  (irc.freenode.net, #sentry)

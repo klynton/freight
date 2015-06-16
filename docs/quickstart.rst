@@ -14,7 +14,7 @@ Requirements
 
 If you're not using Heroku, you'll need to ensure a few server dependencies:
 
-- Redis (or any `Celery <http://http://www.celeryproject.org/>`_) compatible broker)
+- Redis (or any `Celery <http://http://www.celeryproject.org/>`_ compatible broker)
 - PostgreSQL
 - Python 2.7
 - Node.js
@@ -56,7 +56,7 @@ The following values should be configured:
 
 .. option:: SSH_PRIVATE_KEY
 
-  The SSH private key required for cloning repositories (newlines replaced with \n). This will also be made available to providers as a file-system resource.
+  The SSH private key required for cloning repositories (newlines replaced with ``\n``). This will also be made available to providers as a file-system resource.
 
 .. option:: DEFAULT_TIMEOUT
 
@@ -66,6 +66,7 @@ Google Authentication
 ~~~~~~~~~~~~~~~~~~~~~
 
 The frontend currently only supports authenticating with Google. You'll need a `Google Developer <https://console.developers.google.com/>`_ account in order to create an OAuth2 `webserver application <https://developers.google.com/accounts/docs/OAuth2WebServer>`_.
+Set its *Redirect URI* to `$HOST/auth/complete/`.
 
 .. option:: GOOGLE_CLIENT_ID
 
@@ -195,7 +196,7 @@ Once we've configured our application we can create a new deploy:
 .. code-block:: bash
 
   curlish http://localhost:5000/api/0/tasks/ \
-      -H 'Authorization: Key 3e84744ab2714151b1db789df82b41c0021958fe4d77406e9c0947c34f5c5a70'
+      -H 'Authorization: Key 3e84744ab2714151b1db789df82b41c0021958fe4d77406e9c0947c34f5c5a70' \
       -X POST \
       -J app=example \
       -J ref=master \

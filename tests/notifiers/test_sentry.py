@@ -3,17 +3,15 @@ from __future__ import absolute_import
 import json
 import responses
 
-from urlparse import parse_qs
-
 from freight import notifiers
 from freight.notifiers import NotifierEvent
 from freight.models import TaskStatus
 from freight.testutils import TestCase
 
 
-class SlackNotifierBase(TestCase):
+class SentryNotifierBase(TestCase):
     def setUp(self):
-        self.notifier = notifiers.get('slack')
+        self.notifier = notifiers.get('sentry')
         self.user = self.create_user()
         self.repo = self.create_repo()
         self.app = self.create_app(repository=self.repo)
@@ -24,7 +22,7 @@ class SlackNotifierBase(TestCase):
         )
 
 
-class SlackNotifierTest(SlackNotifierBase):
+class SentryNotifierTest(SentryNotifierBase):
     @responses.activate
     def test_send_finished_task(self):
         responses.add(responses.POST, 'http://example.com/')
@@ -36,9 +34,8 @@ class SlackNotifierTest(SlackNotifierBase):
         call = responses.calls[0]
         assert len(responses.calls) == 1
         assert responses.calls[0].request.url == 'http://example.com/'
-        body = parse_qs(responses.calls[0].request.body)
-        payload = json.loads(body['payload'][0])
-        # TODO(dcramer): we probably shouldnt hardcode this, but it'll do for now
+        body = responses.calls[0].request.body
+        payload = json.loads(body)
         assert payload
 
     @responses.activate
@@ -52,7 +49,6 @@ class SlackNotifierTest(SlackNotifierBase):
         call = responses.calls[0]
         assert len(responses.calls) == 1
         assert responses.calls[0].request.url == 'http://example.com/'
-        body = parse_qs(responses.calls[0].request.body)
-        payload = json.loads(body['payload'][0])
-        # TODO(dcramer): we probably shouldnt hardcode this, but it'll do for now
+        body = responses.calls[0].request.body
+        payload = json.loads(body)
         assert payload

@@ -1,4 +1,4 @@
-from __future__ import absolute_import, unicode_literals
+from __future__ import absolute_import
 
 import flask
 import os
@@ -53,6 +53,8 @@ def create_app(_read_config=True, **config):
     # possible to override per repo
     app.config['SSH_PRIVATE_KEY'] = os.environ.get('SSH_PRIVATE_KEY', '').replace("\\n", "\n")
 
+    app.config['FREIGHT_URL'] = os.environ.get('FREIGHT_URL', '').rstrip('/')
+
     if 'REDISCLOUD_URL' in os.environ:
         app.config['REDIS_URL'] = os.environ['REDISCLOUD_URL']
 
@@ -79,8 +81,12 @@ def create_app(_read_config=True, **config):
     app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True
     app.config['SQLALCHEMY_POOL_SIZE'] = 60
     app.config['SQLALCHEMY_MAX_OVERFLOW'] = 20
+    if 'SQLALCHEMY_DATABASE_URI' in os.environ:
+        app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['SQLALCHEMY_DATABASE_URI']
 
     app.config['BROKER_TRANSPORT'] = None
+    if 'BROKER_URL' in os.environ:
+        app.config['BROKER_URL'] = os.environ['BROKER_URL']
 
     app.config['CELERY_ACCEPT_CONTENT'] = ['json']
     app.config['CELERY_ACKS_LATE'] = True
@@ -162,12 +168,14 @@ def configure_api(app):
     from freight.api.controller import ApiCatchall
     from freight.api.app_details import AppDetailsApiView
     from freight.api.app_index import AppIndexApiView
+    from freight.api.stats import StatsApiView
     from freight.api.task_details import TaskDetailsApiView
     from freight.api.task_index import TaskIndexApiView
     from freight.api.task_log import TaskLogApiView
 
     api.add_resource(AppIndexApiView, '/apps/')
     api.add_resource(AppDetailsApiView, '/apps/<app_id>/')
+    api.add_resource(StatsApiView, '/stats/')
     api.add_resource(TaskIndexApiView, '/tasks/')
     api.add_resource(TaskDetailsApiView, '/tasks/<task_id>/')
     api.add_resource(TaskLogApiView, '/tasks/<task_id>/log/')
